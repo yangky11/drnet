@@ -4,6 +4,9 @@ import cv2
 import numpy as np
 import math
 import json
+import argparse
+import pickle
+
 
 class DataLoader:
 	def __init__(self, datasetRoot, split):
@@ -17,14 +20,14 @@ class DataLoader:
 		self._relList = mat["predicate"]
 		self._numRelClass = len(self._relList)
 		self._relMapping = {}
-		for i in xrange(len(self._relList)):
+		for i in range(len(self._relList)):
 			self._relMapping[self._relList[i]] = i	
 		mat = mp.loadmat(osp.join(self._root, "objectListN.mat"))
 		self._objList = mat["objectListN"]
 		self._numObjClass = len(self._objList) + 1
 		self._objMapping = {}
 		self._objMapping["__BG"] = 0
-		for i in xrange(len(self._objList)):
+		for i in range(len(self._objList)):
 			self._objMapping[self._objList[i]] = i + 1	
 
 	def _loadAnnotation(self, split):
@@ -40,7 +43,7 @@ class DataLoader:
 	def _getNumRel(self):
 		numRels = 0
 		n = self._getNumImgs()
-		for i in xrange(n):
+		for i in range(n):
 			rels = self._getRels(i)
 			numRels += len(rels)	
 		return numRels
@@ -77,31 +80,51 @@ class DataLoader:
 			min(ih, max(aBB[3], bBB[3]) + margin)]
 
 	def _getRelSamplesSingle(self):
+		image_paths = []
+		gt_label = []
+		gt_box = []
 		n = self._getNumImgs()
 		self._sampleIdx = 0
 		samples = []
-		for i in xrange(n):
+		for i in range(n):
 			rels = self._getRels(i)
 			if len(rels) == 0:
 				continue
 			path = self._getImPath(i)
+			image_paths.append(path)
 			im = cv2.imread(path)
 			ih = im.shape[0]	
 			iw = im.shape[1]
+			labels = []
+			boxes = []
 			for rel in rels:
 				phrase = rel["phrase"]
 				rLabel = self._getRelLabel(phrase[1])
 				aLabel = self._getObjLabel(phrase[0])
 				bLabel = self._getObjLabel(phrase[2])
+				labels.append(np.asarray([aLabel, rLabel, bLabel], dtype=np.int32))
 				aBBox = self._bboxTransform(rel["subBox"], ih, iw)
 				bBBox = self._bboxTransform(rel["objBox"], ih, iw)
 				rBBox = self._getUnionBBox(aBBox, bBBox, ih, iw)	
+				boxes.append(np.asarray([aBBox, bBBox], dtype=np.int32))
 				samples.append({"imPath": path, "rLabel": rLabel, "aLabel": aLabel, "bLabel": bLabel, "rBBox": rBBox, "aBBox": aBBox, "bBBox": bBBox})
-				self._sampleIdx += 1	
+				self._sampleIdx += 1
 				if self._sampleIdx % 100 == 0:
-					print self._sampleIdx
+					print(self._sampleIdx)
+			gt_label.append(np.stack(labels))
+			gt_box.append(np.stack(boxes))
 		self._outputDB("rel", samples)	
+		json.dump(image_paths, open('image_paths_vrd.json', 'wt'))
+		pickle.dump((gt_label, gt_box), open('gt_vrd.pickle', 'wb'))
+
 		
 if __name__ == "__main__":
-	loader = DataLoader("/datasets/vrd", "test")
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--dataset', type=str, choices=['vrd', 'vg'], default='vrd')
+	parser.add_argument('--split', type=str, choices=['train', 'test'], default='test')
+	args = parser.parse_args()
+	print(args)
+
+	datapath = './datasets/' + args.dataset
+	loader = DataLoader(datapath, args.split)
 	loader._getRelSamplesSingle()

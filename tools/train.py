@@ -48,9 +48,9 @@ def parse_args():
 
 	parser.add_argument('--out', dest='out', help='name of output file', default='pred_vrd.cPickle', type=str)
 
-	if len(sys.argv) == 1:
-		parser.print_help()
-		sys.exit(1)
+	#if len(sys.argv) == 1:
+	#	parser.print_help()
+	#	sys.exit(1)
 
 	args = parser.parse_args()
 	return args
@@ -180,9 +180,8 @@ if __name__ == '__main__':
 
 	caffe.set_mode_gpu()
 	caffe.set_device(args.gpu_id)
-	net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
+        print(args.prototxt)
+	net = caffe.Net(args.prototxt, caffe.TRAIN)
 
-	test_image_paths = json.load(open(args.image_paths))
-
-	test_net(net, test_image_paths, args)
-	
+	solver = caffe.SGDSolver('../vrd_solver.prototxt')	
+	solver.net.forward()

@@ -6,7 +6,7 @@ import argparse
 import time, os, sys
 import json
 import cv2
-import cPickle as cp
+import pickle
 import numpy as np
 import math
 from utils.eval_utils import computeIoU
@@ -26,7 +26,7 @@ def parse_args():
 	#				    [x1_o, y1_o, x2_o, y2_o]]
 	parser.add_argument('--gt_file', dest='gt_file',
 						help='file containing gts',
-						default=None, type=str)
+						default='gt_vrd.pickle', type=str)
 	parser.add_argument('--num_dets', dest='num_dets',
 						help='max number of detections per image',
 						default=50, type=int)
@@ -40,7 +40,7 @@ def parse_args():
 	#				    [x1_o, y1_o, x2_o, y2_o]]
 	parser.add_argument('--det_file', dest='det_file', 
 						help='file containing triplet detections',
-						default=None, type=str)
+						default='pred_vrd.pickle', type=str)
 	
 	parser.add_argument('--min_overlap', dest='ov_thresh',
 						help='minimum overlap for a correct detection',
@@ -60,18 +60,18 @@ def computeOverlap(detBBs, gtBBs):
 	return min(aIoU, bIoU)		
 
 def eval_recall(args):
-	f = open(args.det_file, "r")
-	dets, det_bboxes = cp.load(f)
+	f = open(args.det_file, "rb")
+	dets, det_bboxes = pickle.load(f)
 	f.close()
-	f = open(args.gt_file, "r")
-	all_gts, all_gt_bboxes = cp.load(f)
+	f = open(args.gt_file, "rb")
+	all_gts, all_gt_bboxes = pickle.load(f)
 	f.close()
 	num_img = len(dets)
 	tp = []
 	fp = []
 	score = []
 	total_num_gts = 0
-	for i in xrange(num_img):
+	for i in range(num_img):
 		gts = all_gts[i]
 		gt_bboxes = all_gt_bboxes[i]
 		num_gts = gts.shape[0]
@@ -86,10 +86,10 @@ def eval_recall(args):
 			top_scores = det_score[inds]
 			top_det_bboxes = det_bboxes[i][inds, :]
 			num_dets = len(inds)
-			for j in xrange(num_dets):
+			for j in range(num_dets):
 				ov_max = 0
 				arg_max = -1
-				for k in xrange(num_gts):
+				for k in range(num_gts):
 					if gt_detected[k] == 0 and top_dets[j, 0] == gts[k, 0] and top_dets[j, 1] == gts[k, 1] and top_dets[j, 2] == gts[k, 2]:
 						ov = computeOverlap(top_det_bboxes[j, :, :], gt_bboxes[k, :, :])
 						if ov >= args.ov_thresh and ov > ov_max:
@@ -114,7 +114,7 @@ def eval_recall(args):
 	fp = np.cumsum(fp)
 	recall = (tp + 0.0) / total_num_gts
 	top_recall = recall[-1] 
-	print top_recall						
+	print(top_recall)					
 
 if __name__ == '__main__':
 	args = parse_args()
