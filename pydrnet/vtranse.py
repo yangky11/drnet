@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import torchvision.models as models
 from collections import OrderedDict
 import random
-from crf import CRF
 
 
 class VtransE(nn.Module):
@@ -20,7 +19,6 @@ class VtransE(nn.Module):
     nn.init.uniform(self.scale_factor)  
     self.W_o = nn.Linear(feature_dim, 70, bias=False)
     self.W_s = nn.Linear(feature_dim, 70, bias=False)
-    self.crf = CRF()
 
 
   def forward(self, subj, obj, full_im, t_s, t_o, bbox_s, bbox_o):
@@ -42,7 +40,6 @@ class VtransE(nn.Module):
     x_s = torch.cat([subj, t_s, subj_img_feature], 1) * self.scale_factor
     x_o = torch.cat([obj, t_o, obj_img_feature], 1) * self.scale_factor
     return self.W_o(x_o) - self.W_s(x_s)
-    #return self.crf(self.W_o(x_o) - self.W_s(x_s))
 
   
   def fix_bbox(self, bbox):

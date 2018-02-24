@@ -4,6 +4,7 @@ import torch.autograd as autograd
 from dataloader import dataloader
 from drnet import DRNet
 from vtranse import VtransE
+from baseline import V
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tensorboardX import SummaryWriter
 import argparse
@@ -34,19 +35,20 @@ def train(model, criterion, loader, epoch, summary_writer, args):
       im_batch_var = autograd.Variable(data_batch['im'].cuda(async=True), requires_grad=False)
       posdata_batch_var = autograd.Variable(data_batch['posdata'].cuda(async=True), requires_grad=False)
       output_batch_var = model(qa_batch_var, qb_batch_var, im_batch_var, posdata_batch_var)
-    else:
+    elif args.model == 'vtranse':
       im_batch_var = autograd.Variable(data_batch['full_im'].cuda(async=True), requires_grad=False)
       ts_batch_var = autograd.Variable(data_batch['t_s'].cuda(async=True), requires_grad=False)
       to_batch_var = autograd.Variable(data_batch['t_o'].cuda(async=True), requires_grad=False)
       bboxs_batch_var = autograd.Variable(data_batch['bbox_s'].cuda(async=True), requires_grad=False)
       bboxo_batch_var = autograd.Variable(data_batch['bbox_o'].cuda(async=True), requires_grad=False)
       output_batch_var = model(qa_batch_var, qb_batch_var, im_batch_var, ts_batch_var, to_batch_var, bboxs_batch_var, bboxo_batch_var)
+    else:
+      im_batch_var = autograd.Variable(data_batch['im'].cuda(async=True), requires_grad=False)
+      output_batch_var = model(im_batch_var)
 
     loss_batch_var = criterion(output_batch_var, label_batch_var)
 
     loss_batch = loss_batch_var.data[0]
-    print()
-    print(loss_batch)
     loss += (torch.numel(data_batch['label']) * loss_batch)
     acc += num_true_positives(output_batch_var, label_batch_var)
     num_samples += torch.numel(data_batch['label'])
@@ -80,13 +82,16 @@ def test(model, criterion, loader, epoch, summary_writer, args):
       im_batch_var = autograd.Variable(data_batch['im'].cuda(async=True), volatile=True)
       posdata_batch_var = autograd.Variable(data_batch['posdata'].cuda(async=True), volatile=True)
       output_batch_var = model(qa_batch_var, qb_batch_var, im_batch_var, posdata_batch_var)
-    else:
+    elif args.model == 'vtranse':
       im_batch_var = autograd.Variable(data_batch['full_im'].cuda(async=True), volatile=True)
       ts_batch_var = autograd.Variable(data_batch['t_s'].cuda(async=True), volatile=True)
       to_batch_var = autograd.Variable(data_batch['t_o'].cuda(async=True), volatile=True)
       bboxs_batch_var = autograd.Variable(data_batch['bbox_s'].cuda(async=True), volatile=True)
       bboxo_batch_var = autograd.Variable(data_batch['bbox_o'].cuda(async=True), volatile=True)
       output_batch_var = model(qa_batch_var, qb_batch_var, im_batch_var, ts_batch_var, to_batch_var, bboxs_batch_var, bboxo_batch_var)
+    else:
+      im_batch_var = autograd.Variable(data_batch['im'].cuda(async=True), volatile=True)
+      output_batch_var = model(im_batch_var)
 
     loss_batch_var = criterion(output_batch_var, label_batch_var)
 
@@ -115,7 +120,7 @@ parser.add_argument('--batchsize', type=int, default=32)
 parser.add_argument('--num_epochs', type=int, default=20)
 parser.add_argument('--momentum', type=float, default=0.9)
 parser.add_argument('--weight_decay', type=float, default=1e-6)
-parser.add_argument('--model', type=str, default='drnet', choices=['drnet', 'vtranse'])
+parser.add_argument('--model', type=str, default='drnet', choices=['drnet', 'vtranse', 'baseline'])
 args = parser.parse_args()
 if args.exp_id != None:
   args.log_dir = os.path.join('./runs', args.exp_id)
@@ -132,8 +137,10 @@ print('%d batches of testing examples' % len(loader_test))
 
 if args.model == 'drnet':
   model = DRNet()
-else:
+elif args.model == 'vtranse':
   model = VtransE()
+else:
+  model = V()
 model.cuda()
 criterion = nn.CrossEntropyLoss()
 criterion.cuda()

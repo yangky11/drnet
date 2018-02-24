@@ -71,9 +71,9 @@ def predict(model, output_file, args, image_paths_file='image_paths_vrd.json', g
       sub = gt_bboxes[j, 0, :]
       obj = gt_bboxes[j, 1, :]
       rBB = getUnionBBox(sub, obj, ih, iw)
-      if args.model == 'drnet':
+      if args.model in ['drnet', 'baseline']:
         rAppr = getAppr(im, rBB)
-      else:
+      elif args.model == 'vtranse':
         rAppr = getAppr(im, [0, 0, iw, ih])
       rMask = np.array([getDualMask(ih, iw, sub), getDualMask(ih, iw, obj)])
       ims.append(rAppr)
@@ -120,12 +120,14 @@ def predict(model, output_file, args, image_paths_file='image_paths_vrd.json', g
       if args.model == 'drnet':
         posdata_batch = autograd.Variable(torch.Tensor(poses[_cursor : _end_batch]).cuda(async=True), volatile=True)
         itr_pred_batch = model(qa_batch, qb_batch, im_batch, posdata_batch).data.cpu()
-      else:
+      elif args.model == 'vtranse':
         ts_batch = autograd.Variable(torch.Tensor(t_s[_cursor : _end_batch]).cuda(async=True), volatile=True)
         to_batch = autograd.Variable(torch.Tensor(t_o[_cursor : _end_batch]).cuda(async=True), volatile=True)
         bboxs_batch = autograd.Variable(torch.Tensor(bbox_s[_cursor : _end_batch]).cuda(async=True), volatile=True)
         bboxo_batch = autograd.Variable(torch.Tensor(bbox_o[_cursor : _end_batch]).cuda(async=True), volatile=True)
         itr_pred_batch = model(qa_batch, qb_batch, im_batch, ts_batch, to_batch, bboxs_batch, bboxo_batch).data.cpu()
+      else:
+        itr_pred_batch = model(im_batch).data.cpu()
 
       if itr_pred is None:
         itr_pred = itr_pred_batch
